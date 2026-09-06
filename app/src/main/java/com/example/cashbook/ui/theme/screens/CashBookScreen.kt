@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cashbook.Repository.SessionManager
 import com.example.cashbook.ui.theme.CashBookTheme
 import com.example.cashbook.ui.theme.components.BottomNavigationBar
 import com.example.cashbook.ui.theme.components.CreditButton
@@ -29,19 +31,21 @@ fun CashBookScreen(
     viewModel: TransactionViewModel = viewModel()
 ) {
 
+    val context = LocalContext.current
+    val accountId = remember { SessionManager.getAccountId(context) }
+
     val transactions by viewModel.transactions.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
     val today = remember { LocalDate.now() }
-    val todayIso = remember { today.toString() } // yyyy-MM-dd, matches backend format
+    val todayIso = remember { today.toString() }
     val todayDisplay = remember {
         today.format(DateTimeFormatter.ofPattern("dd MMMM yyyy"))
     }
 
-    // Refresh whenever this screen is shown
-    LaunchedEffect(Unit) {
-        viewModel.loadTransactions()
+    LaunchedEffect(accountId) {
+        accountId?.let { viewModel.loadTransactions(it) }
     }
 
     Scaffold(
@@ -72,6 +76,14 @@ fun CashBookScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
+
+            if (accountId == null) {
+                Text(
+                    text = "No account found. Please log out and log in again.",
+                    color = MaterialTheme.colorScheme.error
+                )
+                return@Column
+            }
 
             Text(
                 text = todayDisplay,

@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cashbook.R
+import com.example.cashbook.Repository.SessionManager
 import com.example.cashbook.ui.theme.CashBookTheme
 import com.example.cashbook.ViewModel.TransactionViewModel
 import java.time.LocalDate
@@ -25,8 +27,8 @@ fun CreditEntryScreen(
     viewModel: TransactionViewModel = viewModel()
 ) {
 
-    // TODO: replace with a real account picker once multi-account support is added
-    val accountId = 1
+    val context = LocalContext.current
+    val accountId = remember { SessionManager.getAccountId(context) }
 
     val entryDate = remember(targetDate) {
         targetDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
@@ -40,7 +42,9 @@ fun CreditEntryScreen(
     var jf by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
-    var validationError by remember { mutableStateOf<String?>(null) }
+    var validationError by remember {
+        mutableStateOf(if (accountId == null) "No account found. Please log out and log in again." else null)
+    }
 
     val isLoading by viewModel.isLoading.collectAsState()
 
@@ -157,6 +161,9 @@ fun CreditEntryScreen(
                     val amountValue = amount.toDoubleOrNull()
 
                     when {
+                        accountId == null -> {
+                            validationError = "No account found. Please log out and log in again."
+                        }
                         particular.isBlank() -> {
                             validationError = "Particulars is required"
                         }
@@ -182,7 +189,7 @@ fun CreditEntryScreen(
                         }
                     }
                 },
-                enabled = !isLoading,
+                enabled = !isLoading && accountId != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(55.dp)

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+import com.example.cashbook.Repository.SessionManager
 import com.example.cashbook.ui.theme.CashBookTheme
 import com.example.cashbook.ui.theme.components.BottomNavigationBar
 import com.example.cashbook.ViewModel.AccountViewModel
@@ -31,10 +32,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 
-// ----------------------------------------------------
-// Monthly Row Data
-// ----------------------------------------------------
-
 data class MonthlyRow(
     val date: String,
     val opening: String,
@@ -43,10 +40,6 @@ data class MonthlyRow(
     val closing: String
 )
 
-
-// ----------------------------------------------------
-// Monthly Report Screen
-// ----------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,18 +53,19 @@ fun MonthlyReportScreen(
 ) {
 
     val context = LocalContext.current
+    val accountId = remember { SessionManager.getAccountId(context) }
 
     val accounts by accountViewModel.accounts.collectAsState()
     val transactions by transactionViewModel.transactions.collectAsState()
     val isLoading by transactionViewModel.isLoading.collectAsState()
 
-    LaunchedEffect(Unit) {
-        accountViewModel.loadAccounts()
-        transactionViewModel.loadTransactions()
+    LaunchedEffect(accountId) {
+        accountId?.let {
+            accountViewModel.loadAccountById(it)
+            transactionViewModel.loadTransactions(it)
+        }
     }
 
-    // TODO: replace with a real account picker once multi-account support is added
-    val accountId = 1
     val openingBalanceOfAccount = accounts.find { it.accountId == accountId }?.openingBalance ?: 0.0
 
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -79,12 +73,10 @@ fun MonthlyReportScreen(
     val monthStart = currentMonth.atDay(1)
     val monthEnd = currentMonth.atEndOfMonth()
 
-    // All transactions, sorted chronologically, needed to compute a running balance
     val sortedTransactions = remember(transactions) {
         transactions.sortedWith(compareBy({ it.transactionDate }, { it.transactionId }))
     }
 
-    // Balance carried in from before this month started
     val balanceBeforeMonth = remember(sortedTransactions, currentMonth, openingBalanceOfAccount) {
         var balance = openingBalanceOfAccount
         for (t in sortedTransactions) {
@@ -139,23 +131,12 @@ fun MonthlyReportScreen(
     val totalPayments = monthTransactions.filter { it.transactionType == "DEBIT" }.sumOf { it.amount }
     val closingBalance = balanceBeforeMonth + totalReceipts - totalPayments
 
-
-    // ------------------------------------------------
-    // CSV File Picker
-    // ------------------------------------------------
-
     val fileNameSafeMonth = currentMonth.format(DateTimeFormatter.ofPattern("MMMM_yyyy"))
 
     val csvLauncher = rememberLauncherForActivityResult(
-
-        contract = ActivityResultContracts.CreateDocument(
-            "text/csv"
-        )
-
+        contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri: Uri? ->
-
         if (uri != null) {
-
             exportMonthlyReport(
                 context = context,
                 uri = uri,
@@ -166,11 +147,6 @@ fun MonthlyReportScreen(
             )
         }
     }
-
-
-    // ------------------------------------------------
-    // Scaffold
-    // ------------------------------------------------
 
     Scaffold(
 
@@ -201,9 +177,13 @@ fun MonthlyReportScreen(
                 .padding(12.dp)
         ) {
 
-            // ------------------------------------------------
-            // Month Selector
-            // ------------------------------------------------
+            if (accountId == null) {
+                Text(
+                    text = "No account found. Please log out and log in again.",
+                    color = MaterialTheme.colorScheme.error
+                )
+                return@Column
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -230,10 +210,6 @@ fun MonthlyReportScreen(
             }
 
             Spacer(modifier = Modifier.height(15.dp))
-
-            // ------------------------------------------------
-            // Report Table
-            // ------------------------------------------------
 
             if (isLoading) {
 
@@ -269,7 +245,6 @@ fun MonthlyReportScreen(
                         .horizontalScroll(rememberScrollState())
                 ) {
 
-                    // Table Header
                     Row(
                         modifier = Modifier
                             .width(680.dp)
@@ -283,7 +258,6 @@ fun MonthlyReportScreen(
                         ReportCell(text = "Closing", width = 150.dp, bold = true)
                     }
 
-                    // Table Data
                     monthlyRows.forEach { row ->
 
                         Row(
@@ -300,7 +274,6 @@ fun MonthlyReportScreen(
                         }
                     }
 
-                    // Total Row
                     Row(
                         modifier = Modifier
                             .width(680.dp)
@@ -317,10 +290,6 @@ fun MonthlyReportScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            // ------------------------------------------------
-            // Download Button
-            // ------------------------------------------------
 
             Button(
 
@@ -341,10 +310,6 @@ fun MonthlyReportScreen(
     }
 }
 
-
-// ----------------------------------------------------
-// Report Table Cell
-// ----------------------------------------------------
 
 @Composable
 private fun ReportCell(
@@ -384,10 +349,6 @@ private fun ReportCell(
     }
 }
 
-
-// ----------------------------------------------------
-// Export Monthly Report as CSV
-// ----------------------------------------------------
 
 private fun exportMonthlyReport(
     context: Context,
@@ -430,10 +391,6 @@ private fun exportMonthlyReport(
     }
 }
 
-
-// ----------------------------------------------------
-// Preview
-// ----------------------------------------------------
 
 @Preview(
     showBackground = true,

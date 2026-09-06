@@ -7,11 +7,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.cashbook.ui.theme.components.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cashbook.Repository.SessionManager
 import com.example.cashbook.ui.theme.CashBookTheme
 import com.example.cashbook.ViewModel.AccountViewModel
 import com.example.cashbook.ViewModel.TransactionViewModel
@@ -22,8 +24,8 @@ import java.util.Locale
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun DashboardScreen(
-    onCreditClick: (String) -> Unit,   // receives the currently-viewed date, ISO "yyyy-MM-dd"
-    onDebitClick: (String) -> Unit,    // receives the currently-viewed date, ISO "yyyy-MM-dd"
+    onCreditClick: (String) -> Unit,
+    onDebitClick: (String) -> Unit,
     onCashBookClick: () -> Unit,
     onReportsClick: () -> Unit,
     onAccountsClick: () -> Unit,
@@ -32,26 +34,28 @@ fun DashboardScreen(
     transactionViewModel: TransactionViewModel = viewModel()
 ) {
 
+    val context = LocalContext.current
+    val accountId = remember { SessionManager.getAccountId(context) }
+
     val accounts by accountViewModel.accounts.collectAsState()
     val transactions by transactionViewModel.transactions.collectAsState()
     val isLoading by transactionViewModel.isLoading.collectAsState()
 
-    LaunchedEffect(Unit) {
-        accountViewModel.loadAccounts()
-        transactionViewModel.loadTransactions()
+    LaunchedEffect(accountId) {
+        accountId?.let {
+            accountViewModel.loadAccountById(it)
+            transactionViewModel.loadTransactions(it)
+        }
     }
 
-    // TODO: replace with a real account picker once multi-account support is added
-    val accountId = 1
     val openingBalance = accounts.find { it.accountId == accountId }?.openingBalance ?: 0.0
 
     val today = remember { LocalDate.now() }
     var selectedDate by remember { mutableStateOf(today) }
     val selectedDateIso = remember(selectedDate) { selectedDate.toString() }
     val isToday = selectedDate == today
-    val isFutureBlocked = selectedDate >= today // never allow going past today
+    val isFutureBlocked = selectedDate >= today
 
-    // Running balance as of end of the selected day
     val sortedTransactions = remember(transactions) {
         transactions.sortedWith(compareBy({ it.transactionDate }, { it.transactionId }))
     }
@@ -108,9 +112,14 @@ fun DashboardScreen(
                 .verticalScroll(rememberScrollState())
         ) {
 
-            // ------------------------------------------------
-            // Day Selector
-            // ------------------------------------------------
+            if (accountId == null) {
+                Text(
+                    text = "No account found. Please log out and log in again.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                return@Column
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

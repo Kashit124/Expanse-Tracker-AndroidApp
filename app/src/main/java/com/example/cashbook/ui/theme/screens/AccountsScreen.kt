@@ -4,10 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cashbook.Repository.SessionManager
 import com.example.cashbook.ui.theme.CashBookTheme
 import com.example.cashbook.ui.theme.components.BottomNavigationBar
 import com.example.cashbook.ViewModel.AccountViewModel
@@ -28,17 +29,20 @@ fun AccountsScreen(
     authViewModel: AuthViewModel = viewModel()
 ) {
 
+    val context = LocalContext.current
+    val accountId = remember { SessionManager.getAccountId(context) }
+
     val accounts by accountViewModel.accounts.collectAsState()
     val transactions by transactionViewModel.transactions.collectAsState()
     val isLoading by transactionViewModel.isLoading.collectAsState()
 
-    LaunchedEffect(Unit) {
-        accountViewModel.loadAccounts()
-        transactionViewModel.loadTransactions()
+    LaunchedEffect(accountId) {
+        accountId?.let {
+            accountViewModel.loadAccountById(it)
+            transactionViewModel.loadTransactions(it)
+        }
     }
 
-    // TODO: replace with a real account picker once multi-account support is added
-    val accountId = 1
     val openingBalance = accounts.find { it.accountId == accountId }?.openingBalance ?: 0.0
     val totalCredit = transactions.filter { it.transactionType == "CREDIT" }.sumOf { it.amount }
     val totalDebit = transactions.filter { it.transactionType == "DEBIT" }.sumOf { it.amount }
@@ -80,10 +84,6 @@ fun AccountsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ------------------------------------------------
-            // Logged-in user
-            // ------------------------------------------------
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -92,7 +92,7 @@ fun AccountsScreen(
 
                 Column {
                     Text(
-                        text = "User ",
+                        text = "Logged in as",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -108,92 +108,96 @@ fun AccountsScreen(
                 style = MaterialTheme.typography.titleLarge
             )
 
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+            if (accountId == null) {
+                Text(
+                    text = "No account found. Please log out and log in again.",
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
+
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
-            }
 
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Column(
-                    modifier = Modifier.padding(16.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
 
-                    Text(
-                        text = "Cash Balance",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
 
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
+                        Text(
+                            text = "Cash Balance",
+                            style = MaterialTheme.typography.titleMedium
+                        )
 
-                    Text(
-                        text = rupees(cashBalance),
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        Text(
+                            text = rupees(cashBalance),
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
                 }
-            }
 
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Column(
-                    modifier = Modifier.padding(16.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
 
-                    Text(
-                        text = "Total Credit",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
 
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
+                        Text(
+                            text = "Total Credit",
+                            style = MaterialTheme.typography.titleMedium
+                        )
 
-                    Text(
-                        text = rupees(totalCredit),
-                        style = MaterialTheme.typography.headlineSmall
-                    )
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        Text(
+                            text = rupees(totalCredit),
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                    }
                 }
-            }
 
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Column(
-                    modifier = Modifier.padding(16.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
 
-                    Text(
-                        text = "Total Debit",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
 
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
+                        Text(
+                            text = "Total Debit",
+                            style = MaterialTheme.typography.titleMedium
+                        )
 
-                    Text(
-                        text = rupees(totalDebit),
-                        style = MaterialTheme.typography.headlineSmall
-                    )
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        Text(
+                            text = rupees(totalDebit),
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
-
-            // ------------------------------------------------
-            // Log Out
-            // ------------------------------------------------
 
             OutlinedButton(
                 onClick = { showLogoutConfirm = true },
