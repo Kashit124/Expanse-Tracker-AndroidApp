@@ -23,59 +23,26 @@ class AccountViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    init {
-        loadAccounts()
-    }
-
-    fun loadAccounts() {
+    // Loads only the one account belonging to the currently logged-in user
+    fun loadAccountById(accountId: Int) {
         viewModelScope.launch {
             _isLoading.value = true
-            repository.getAllAccounts()
-                .onSuccess { _accounts.value = it }
-                .onFailure { _errorMessage.value = it.message ?: "Failed to load accounts" }
+            repository.getAccountById(accountId)
+                .onSuccess { _accounts.value = listOf(it) }
+                .onFailure { _errorMessage.value = it.message ?: "Failed to load account" }
             _isLoading.value = false
         }
     }
 
-    fun createAccount(name: String, openingBalance: Double, onComplete: (Boolean) -> Unit = {}) {
+    fun updateAccount(id: Int, userId: Int, name: String, openingBalance: Double, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
-            _isLoading.value = true
-            repository.createAccount(AccountRequest(name, openingBalance))
+            repository.updateAccount(id, AccountRequest(userId, name, openingBalance))
                 .onSuccess {
-                    loadAccounts()
-                    onComplete(true)
-                }
-                .onFailure {
-                    _errorMessage.value = it.message ?: "Failed to create account"
-                    onComplete(false)
-                }
-            _isLoading.value = false
-        }
-    }
-
-    fun updateAccount(id: Int, name: String, openingBalance: Double, onComplete: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            repository.updateAccount(id, AccountRequest(name, openingBalance))
-                .onSuccess {
-                    loadAccounts()
+                    loadAccountById(id)
                     onComplete(true)
                 }
                 .onFailure {
                     _errorMessage.value = it.message ?: "Failed to update account"
-                    onComplete(false)
-                }
-        }
-    }
-
-    fun deleteAccount(id: Int, onComplete: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            repository.deleteAccount(id)
-                .onSuccess {
-                    loadAccounts()
-                    onComplete(true)
-                }
-                .onFailure {
-                    _errorMessage.value = it.message ?: "Failed to delete account"
                     onComplete(false)
                 }
         }

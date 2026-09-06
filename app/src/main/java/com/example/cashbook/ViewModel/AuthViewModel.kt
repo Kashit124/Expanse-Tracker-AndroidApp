@@ -3,6 +3,7 @@ package com.example.cashbook.ViewModel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.cashbook.Repository.AccountRepository
 import com.example.cashbook.Repository.AuthRepository
 import com.example.cashbook.Repository.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +13,8 @@ import kotlinx.coroutines.launch
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = AuthRepository()
+    private val authRepository = AuthRepository()
+    private val accountRepository = AccountRepository()
 
     // Read once at startup — reflects whatever was saved from a previous session
     private val _isLoggedIn = MutableStateFlow(SessionManager.isLoggedIn(application))
@@ -34,9 +36,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
-            repository.login(username, password)
+            authRepository.login(username, password)
                 .onSuccess { response ->
                     SessionManager.saveSession(getApplication(), response.userId, response.username)
+                    loadAndSaveAccountId(response.userId)
                     _isLoggedIn.value = true
                     onComplete(true)
                 }
@@ -52,9 +55,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
-            repository.register(username, password)
+            authRepository.register(username, password)
                 .onSuccess { response ->
                     SessionManager.saveSession(getApplication(), response.userId, response.username)
+                    loadAndSaveAccountId(response.userId)
                     _isLoggedIn.value = true
                     onComplete(true)
                 }
@@ -66,12 +70,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Fetches this specific user's own account (created automatically at registration)
+    // and stores its accountId locally — this is what keeps each user's data separate
+    private suspend fun loadAndSaveAccountId(userId: Int) {
+        accountRepository.getAccountsByUser(userId)
+            .onSuccess { accounts ->
+                accounts.firstOrNull()?.let { account ->
+                    SessionManager.saveAccountId(getApplication(), account.accountId)
+                }
+            }
+    }
+
     fun resetPassword(username: String, newPassword: String, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             _resetSuccess.value = false
-            repository.resetPassword(username, newPassword)
+            authRepository.resetPassword(username, newPassword)
                 .onSuccess {
                     _resetSuccess.value = true
                     onComplete(true)

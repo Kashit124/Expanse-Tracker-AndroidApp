@@ -23,18 +23,23 @@ class TransactionViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    init {
-        loadTransactions()
-    }
+    // Remembers which account is currently loaded, so add/update/delete can refresh correctly
+    private var currentAccountId: Int? = null
 
-    fun loadTransactions() {
+    // Loads only this account's transactions — never everyone's
+    fun loadTransactions(accountId: Int) {
+        currentAccountId = accountId
         viewModelScope.launch {
             _isLoading.value = true
-            repository.getAllTransactions()
+            repository.getTransactionsByAccount(accountId)
                 .onSuccess { _transactions.value = it }
                 .onFailure { _errorMessage.value = it.message ?: "Failed to load transactions" }
             _isLoading.value = false
         }
+    }
+
+    private fun refresh() {
+        currentAccountId?.let { loadTransactions(it) }
     }
 
     // ---- Convenience wrappers matching CreditEntryScreen / DebitEntryScreen ----
@@ -90,7 +95,7 @@ class TransactionViewModel(
             _isLoading.value = true
             repository.createTransaction(request)
                 .onSuccess {
-                    loadTransactions()
+                    refresh()
                     onComplete(true)
                 }
                 .onFailure {
@@ -105,7 +110,7 @@ class TransactionViewModel(
         viewModelScope.launch {
             repository.updateTransaction(id, request)
                 .onSuccess {
-                    loadTransactions()
+                    refresh()
                     onComplete(true)
                 }
                 .onFailure {
@@ -119,7 +124,7 @@ class TransactionViewModel(
         viewModelScope.launch {
             repository.deleteTransaction(id)
                 .onSuccess {
-                    loadTransactions()
+                    refresh()
                     onComplete(true)
                 }
                 .onFailure {

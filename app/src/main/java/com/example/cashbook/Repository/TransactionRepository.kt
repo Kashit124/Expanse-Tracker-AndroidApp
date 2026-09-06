@@ -13,6 +13,10 @@ class TransactionRepository(
         apiService.getAllTransactions()
     }
 
+    suspend fun getTransactionsByAccount(accountId: Int): Result<List<TransactionResponse>> = safeApiCall {
+        apiService.getTransactionsByAccount(accountId)
+    }
+
     suspend fun getTransactionById(id: Int): Result<TransactionResponse> = safeApiCall {
         apiService.getTransactionById(id)
     }

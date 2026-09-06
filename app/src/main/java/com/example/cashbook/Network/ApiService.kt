@@ -29,6 +29,10 @@ interface ApiService {
     @GET("api/accounts")
     suspend fun getAllAccounts(): List<AccountResponse>
 
+    // Used right after login/register to find this user's own account
+    @GET("api/accounts/user/{userId}")
+    suspend fun getAccountsByUser(@Path("userId") userId: Int): List<AccountResponse>
+
     @GET("api/accounts/{id}")
     suspend fun getAccountById(@Path("id") id: Int): AccountResponse
 
@@ -45,6 +49,10 @@ interface ApiService {
 
     @GET("api/transactions")
     suspend fun getAllTransactions(): List<TransactionResponse>
+
+    // Scoped to one account — this is what the app should actually use day-to-day
+    @GET("api/transactions/account/{accountId}")
+    suspend fun getTransactionsByAccount(@Path("accountId") accountId: Int): List<TransactionResponse>
 
     @GET("api/transactions/{id}")
     suspend fun getTransactionById(@Path("id") id: Int): TransactionResponse

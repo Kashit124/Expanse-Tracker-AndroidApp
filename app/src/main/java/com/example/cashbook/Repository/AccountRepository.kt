@@ -13,6 +13,10 @@ class AccountRepository(
         apiService.getAllAccounts()
     }
 
+    suspend fun getAccountsByUser(userId: Int): Result<List<AccountResponse>> = safeApiCall {
+        apiService.getAccountsByUser(userId)
+    }
+
     suspend fun getAccountById(id: Int): Result<AccountResponse> = safeApiCall {
         apiService.getAccountById(id)
     }
