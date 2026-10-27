@@ -20,7 +20,6 @@ fun TransactionTable(
     transactions: List<TransactionRowData>,
     modifier: Modifier = Modifier
 ) {
-
     Column(
         modifier = modifier
             .fillMaxWidth()
